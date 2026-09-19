@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar System // 3D Simulation</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #030712; font-family: sans-serif; }
+        canvas { display: block; }
+        
+        .back-btn { position: fixed; top: 20px; left: 20px; z-index: 10; background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(168, 85, 247, 0.4); color: #fff; padding: 10px 20px; border-radius: 12px; text-decoration: none; backdrop-filter: blur(10px); transition: all 0.3s; font-size: 14px; }
+        .back-btn:hover { border-color: #a855f7; box-shadow: 0 0 15px rgba(168, 85, 247, 0.4); }
+        
+        .launch-btn { position: fixed; top: 20px; right: 20px; z-index: 10; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border: none; color: #fff; padding: 10px 24px; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: bold; box-shadow: 0 0 20px rgba(139, 92, 246, 0.4); transition: all 0.3s; }
+        .launch-btn:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(139, 92, 246, 0.8); }
+        .launch-btn:active { transform: translateY(0); }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-btn">← Вернуться в портфолио</a>
+    <button class="launch-btn" onclick="launchVoyager()">🚀 Запустить Вояджер-1</button>
+    <canvas id="spaceCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('spaceCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Звезды на фоне
+        const stars = Array.from({length: 400}, () => ({
+            x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight,
+            size: Math.random() * 1.5, alpha: Math.random(), speed: Math.random() * 0.05 + 0.01
+        }));
+
+        // Планеты с их орбитами
+        const planets = [
+            { name: 'Меркурий', distance: 70, radius: 4, speed: 0.03, angle: Math.random() * Math.PI * 2, color: '#a855f7' },
+            { name: 'Венера', distance: 110, radius: 7, speed: 0.02, angle: Math.random() * Math.PI * 2, color: '#f97316' },
+            { name: 'Земля', distance: 160, radius: 8, speed: 0.015, angle: Math.random() * Math.PI * 2, color: '#3b82f6' },
+            { name: 'Марс', distance: 220, radius: 6, speed: 0.012, angle: Math.random() * Math.PI * 2, color: '#ef4444' },
+            { name: 'Юпитер', distance: 300, radius: 16, speed: 0.008, angle: Math.random() * Math.PI * 2, color: '#eab308' },
+            { name: 'Сатурн', distance: 380, radius: 13, speed: 0.006, angle: Math.random() * Math.PI * 2, color: '#facc15', rings: true },
+            { name: 'Уран', distance: 450, radius: 10, speed: 0.004, angle: Math.random() * Math.PI * 2, color: '#06b6d4' },
+            { name: 'Нептун', distance: 520, radius: 10, speed: 0.003, angle: Math.random() * Math.PI * 2, color: '#6366f1' }
+        ];
+
+        // Объект Вояджера
+        let voyager = { active: false, angle: 0, dist: 0, trail: [], slingshot: false };
+
+        function launchVoyager() {
+            const earth = planets[2]; // Берем Землю как точку старта
+            voyager.angle = earth.angle;
+            voyager.dist = earth.distance;
+            voyager.trail = [];
+            voyager.slingshot = false;
+            voyager.active = true;
+        }
+
+        function animate() {
+            // Эффект шлейфа (motion blur)
+            ctx.fillStyle = 'rgba(3, 7, 18, 0.3)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const cx = canvas.width / 2, cy = canvas.height / 2;
+
+            // Отрисовка звезд
+            stars.forEach(s => {
+                s.alpha += s.speed; if (s.alpha > 1 || s.alpha < 0.2) s.speed *= -1;
+                ctx.fillStyle = `rgba(255, 255, 255, ${s.alpha})`; ctx.fillRect(s.x, s.y, s.size, s.size);
+            });
+
+            // Отрисовка Солнца
+            const sun = ctx.createRadialGradient(cx, cy, 10, cx, cy, 70);
+            sun.addColorStop(0, '#fde047'); sun.addColorStop(0.5, '#f97316'); sun.addColorStop(1, 'transparent');
+            ctx.fillStyle = sun; ctx.beginPath(); ctx.arc(cx, cy, 70, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fef08a'; ctx.beginPath(); ctx.arc(cx, cy, 24, 0, Math.PI * 2); ctx.fill();
+
+            // Отрисовка планет
+            planets.forEach(p => {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.arc(cx, cy, p.distance, 0, Math.PI * 2); ctx.stroke();
+                p.angle += p.speed;
+                const x = cx + Math.cos(p.angle) * p.distance, y = cy + Math.sin(p.angle) * p.distance;
+                
+                if(p.rings) { 
+                    ctx.strokeStyle = 'rgba(250, 204, 21, 0.4)'; ctx.lineWidth = 3; 
+                    ctx.beginPath(); ctx.arc(x, y, p.radius + 5, 0, Math.PI * 2); ctx.stroke(); 
+                }
+                
+                ctx.fillStyle = p.color; ctx.shadowBlur = 10; ctx.shadowColor = p.color;
+                ctx.beginPath(); ctx.arc(x, y, p.radius, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+            });
+
+            // Логика и отрисовка Вояджера
+            if (voyager.active) {
+                // Если пересекает орбиту Юпитера (дистанция 300) - гравитационный маневр!
+                if (voyager.dist > 300 && !voyager.slingshot) {
+                    voyager.slingshot = true; // Ускоряемся!
+                }
+                
+                // Рассчет спиральной траектории
+                let radialSpeed = voyager.slingshot ? 4.5 : 1.2; // Резкое ускорение от Юпитера
+                let angularSpeed = voyager.slingshot ? 0.001 : 0.006; // Выравнивание траектории
+                
+                voyager.dist += radialSpeed;
+                voyager.angle += angularSpeed;
+                
+                let vx = cx + Math.cos(voyager.angle) * voyager.dist;
+                let vy = cy + Math.sin(voyager.angle) * voyager.dist;
+                
+                // Записываем след (хвост)
+                voyager.trail.push({x: vx, y: vy});
+                if (voyager.trail.length > 150) voyager.trail.shift();
+                
+                // Рисуем пунктирный хвост траектории
+                ctx.beginPath();
+                ctx.strokeStyle = voyager.slingshot ? 'rgba(139, 92, 246, 0.8)' : 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 4]);
+                voyager.trail.forEach((p, i) => {
+                    if(i === 0) ctx.moveTo(p.x, p.y);
+                    else ctx.lineTo(p.x, p.y);
+                });
+                ctx.stroke();
+                ctx.setLineDash([]); // Возвращаем обычную линию для остальных объектов
+                
+                // Рисуем сам зонд
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(vx, vy, 3, 0, Math.PI*2);
+                ctx.fill();
+                
+                // Подпись
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.font = '12px monospace';
+                ctx.fillText('🚀 Вояджер-1', vx + 10, vy - 10);
+            }
+
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
+</body>
+</html>
